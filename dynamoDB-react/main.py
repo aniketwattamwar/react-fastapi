@@ -2,16 +2,18 @@ from fastapi import FastAPI, UploadFile, File
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-app = FastAPI()
 import boto3
 import key_config as keys
+import uuid
 
-s3 = boto3.client('s3',
+app = FastAPI()
+
+dynamodb = boto3.resource('dynamodb',
                     aws_access_key_id = keys.ACCESS_KEY_ID,
                     aws_secret_access_key = keys.ACCESS_SECRET_KEY,
-                     )
+                    region_name='us-east-1'
+                          )
 
-BUCKET_NAME='fastapifiles'
 
 # Set up CORS
 origins = [
@@ -31,18 +33,26 @@ app.add_middleware(
 def read_root():
     return {"name": "aniket", "age":24}
 
-@app.get("/getallfiles")
-async def hello():
-    
-    res = s3.list_objects_v2(Bucket=BUCKET_NAME)
-    print(res)
-    return res
 
-@app.post("/upload")
-async def upload(file: UploadFile = File(...)):
-    if file:
-        print(file.filename)
-        s3.upload_fileobj(file.file, BUCKET_NAME, file.filename)
-        return "file uploaded"
-    else:
-        return "error in uploading."
+@app.get("/getAllBooks")
+def getall():
+    table = dynamodb.Table('books')
+    items = table.scan()
+    print(items)
+    return items
+
+ 
+@app.post("/submitdata")
+async def submitdata(data:dict):
+    table = dynamodb.Table('books')
+    
+    item = {
+       'bookID': str(uuid.uuid4()),
+        'name': data['name'],
+        'author': data['author']
+    }
+    table.put_item(Item = item)
+    print(data)
+    return "data submitted successfully"
+    
+
